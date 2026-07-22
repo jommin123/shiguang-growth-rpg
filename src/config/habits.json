@@ -1,0 +1,17 @@
+[
+  { "id":"breakfast", "label":"认真吃早餐", "icon":"☀", "xp":8, "skillId":"nutrition", "cadence":"day", "parentId":"weekly-energy", "relation":"aggregate", "target":1 },
+  { "id":"reading", "label":"阅读 10 页", "icon":"▤", "xp":10, "skillId":"reading", "cadence":"day", "parentId":"weekly-input", "relation":"aggregate", "target":1 },
+  { "id":"writing", "label":"写下一点东西", "icon":"✎", "xp":12, "skillId":"writing", "cadence":"day", "parentId":"weekly-output", "relation":"aggregate", "target":1 },
+  { "id":"exercise", "label":"活动身体", "icon":"↗", "xp":10, "skillId":"movement", "cadence":"day", "parentId":"weekly-energy", "relation":"aggregate", "target":1 },
+  { "id":"social", "label":"连接一个人", "icon":"∞", "xp":10, "skillId":"relationship", "cadence":"day", "parentId":"weekly-connection", "relation":"aggregate", "target":1 },
+  { "id":"sleepEarly", "label":"23:30 前躺下", "icon":"☾", "xp":10, "skillId":"sleep", "cadence":"day", "parentId":"weekly-energy", "relation":"aggregate", "target":1 },
+  { "id":"weekly-energy", "label":"本周恢复底盘", "icon":"ϟ", "xp":35, "skillId":"energy", "cadence":"week", "parentId":"monthly-rhythm", "relation":"aggregate", "target":3 },
+  { "id":"weekly-input", "label":"完成一次深度输入", "icon":"◉", "xp":30, "skillId":"reading", "cadence":"week", "parentId":"monthly-growth", "relation":"transform", "target":1 },
+  { "id":"weekly-output", "label":"完成一次有效输出", "icon":"◆", "xp":40, "skillId":"writing", "cadence":"week", "parentId":"monthly-growth", "relation":"transform", "target":1 },
+  { "id":"weekly-connection", "label":"安排一次真实见面", "icon":"∴", "xp":35, "skillId":"friendship", "cadence":"week", "parentId":"monthly-life", "relation":"transform", "target":1 },
+  { "id":"monthly-rhythm", "label":"形成稳定生活节奏", "icon":"◌", "xp":90, "skillId":"life", "cadence":"month", "parentId":"quarter-foundation", "relation":"aggregate", "target":3 },
+  { "id":"monthly-growth", "label":"沉淀一个成长主题", "icon":"✦", "xp":100, "skillId":"creator", "cadence":"month", "parentId":"quarter-creation", "relation":"transform", "target":1 },
+  { "id":"monthly-life", "label":"创造一个生活记忆点", "icon":"◇", "xp":80, "skillId":"life", "cadence":"month", "parentId":"quarter-foundation", "relation":"transform", "target":1 },
+  { "id":"quarter-foundation", "label":"生活底盘升级", "icon":"⬡", "xp":220, "skillId":"energy", "cadence":"quarter", "relation":"aggregate", "target":2 },
+  { "id":"quarter-creation", "label":"完成一件代表作品", "icon":"✺", "xp":260, "skillId":"creator", "cadence":"quarter", "relation":"transform", "target":1 }
+]

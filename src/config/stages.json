@@ -1,0 +1,6 @@
+[
+  { "id": "foundation", "order": 1, "title": "重新上线", "subtitle": "先恢复生命值", "minXp": 0, "goal": "稳定吃饭、睡眠与属于自己的时间，让生活重新可感知。", "reward": "解锁：节奏任务组" },
+  { "id": "rhythm", "order": 2, "title": "建立节奏", "subtitle": "让好状态可以重复", "minXp": 180, "goal": "形成稳定输入、输出、外出与恢复节奏，不再只靠意志力。", "reward": "解锁：创造者身份" },
+  { "id": "creation", "order": 3, "title": "开始创造", "subtitle": "把经历变成作品", "minXp": 420, "goal": "完成职业案例、公开表达与个人作品，让能力留下可见证据。", "reward": "解锁：职业分支进阶" },
+  { "id": "choice", "order": 4, "title": "获得选择", "subtitle": "把积累换成机会", "minXp": 760, "goal": "形成作品集、恢复关系连接，并验证更适合自己的工作与生活。", "reward": "解锁：新世界线" }
+]

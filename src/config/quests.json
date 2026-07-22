@@ -1,0 +1,9 @@
+[
+  { "id":"q-breakfast", "title":"七日早餐实验", "description":"一周内至少认真吃 4 次早餐。", "stageId":"foundation", "category":"生活", "xp":35, "skillId":"nutrition", "role":"side", "routeId":"health", "status":"doing" },
+  { "id":"q-night", "title":"夺回晚上的 20 分钟", "description":"完成 5 次阅读、写作或安静独处。", "stageId":"foundation", "category":"恢复", "xp":45, "skillId":"energy", "role":"main", "routeId":"life", "status":"todo" },
+  { "id":"q-log", "title":"留下第一条成长证据", "description":"记录一件经历、你的判断和学到的东西。", "stageId":"foundation", "category":"记录", "xp":30, "skillId":"writing", "role":"side", "routeId":"creation", "status":"todo" },
+  { "id":"q-outing", "title":"建立一个周末据点", "description":"连续三周去固定的公园、咖啡店或图书馆。", "stageId":"rhythm", "category":"生活", "xp":65, "skillId":"life", "status":"todo" },
+  { "id":"q-case", "title":"完成一张职业案例卡", "description":"把 WMS、BI 或 AI 项目整理成背景—判断—行动—结果。", "stageId":"creation", "category":"职业", "xp":80, "skillId":"career", "status":"todo" },
+  { "id":"q-article", "title":"公开一次专业判断", "description":"完成并发布一篇企业数字化观察。", "stageId":"creation", "category":"输出", "xp":120, "skillId":"creator", "status":"todo" },
+  { "id":"q-portfolio", "title":"完成个人作品集 V1", "description":"选择 3 个案例，形成可以投递和交流的作品集。", "stageId":"choice", "category":"机会", "xp":180, "skillId":"narrative", "status":"todo" }
+]

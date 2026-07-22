@@ -1,0 +1,28 @@
+[
+  { "id":"health", "name":"身体底盘", "icon":"✦", "color":"#57E6FF", "level":2, "xp":26, "nextXp":80, "description":"睡眠、饮食与基础恢复", "branch":"生命", "tier":1 },
+  { "id":"sleep", "name":"睡眠节律", "icon":"☾", "color":"#57E6FF", "level":1, "xp":12, "nextXp":70, "description":"稳定入睡与清醒时间", "branch":"生命", "tier":2, "parentId":"health" },
+  { "id":"nutrition", "name":"营养补给", "icon":"◉", "color":"#57E6FF", "level":1, "xp":8, "nextXp":70, "description":"规律吃饭与照顾胃口", "branch":"生命", "tier":2, "parentId":"health" },
+  { "id":"movement", "name":"身体唤醒", "icon":"↗", "color":"#57E6FF", "level":1, "xp":10, "nextXp":70, "description":"骑行、散步与轻运动", "branch":"生命", "tier":2, "parentId":"health" },
+  { "id":"energy", "name":"能量管理", "icon":"ϟ", "color":"#57E6FF", "level":0, "xp":0, "nextXp":90, "description":"识别消耗并主动恢复", "branch":"生命", "tier":3, "parentId":"sleep" },
+
+  { "id":"life", "name":"生活感知", "icon":"◇", "color":"#FF77C8", "level":2, "xp":22, "nextXp":80, "description":"重新拥有自己的生活", "branch":"创造", "tier":1 },
+  { "id":"reading", "name":"深度阅读", "icon":"▤", "color":"#FF77C8", "level":1, "xp":14, "nextXp":70, "description":"用书本打开新的世界", "branch":"创造", "tier":2, "parentId":"life" },
+  { "id":"writing", "name":"持续写作", "icon":"✎", "color":"#FF77C8", "level":1, "xp":18, "nextXp":70, "description":"把观察保存成文字", "branch":"创造", "tier":2, "parentId":"life" },
+  { "id":"cooking", "name":"料理生活", "icon":"⌁", "color":"#FF77C8", "level":1, "xp":8, "nextXp":70, "description":"早餐、带饭与周末料理", "branch":"创造", "tier":2, "parentId":"life" },
+  { "id":"aesthetic", "name":"审美表达", "icon":"◈", "color":"#FF77C8", "level":0, "xp":0, "nextXp":90, "description":"摄影、空间与视觉表达", "branch":"创造", "tier":3, "parentId":"writing" },
+  { "id":"creator", "name":"个人创作者", "icon":"✺", "color":"#FF77C8", "level":0, "xp":0, "nextXp":120, "description":"稳定产出可公开作品", "branch":"创造", "tier":4, "parentId":"aesthetic" },
+
+  { "id":"career", "name":"职业资产", "icon":"⬡", "color":"#A88BFF", "level":2, "xp":42, "nextXp":100, "description":"把经历变成可迁移案例", "branch":"职业", "tier":1 },
+  { "id":"business", "name":"业务判断", "icon":"◎", "color":"#A88BFF", "level":1, "xp":24, "nextXp":80, "description":"判断什么问题值得解决", "branch":"职业", "tier":2, "parentId":"career" },
+  { "id":"data", "name":"数据产品", "icon":"▥", "color":"#A88BFF", "level":1, "xp":32, "nextXp":80, "description":"指标、字段与数据治理", "branch":"职业", "tier":2, "parentId":"career" },
+  { "id":"systems", "name":"系统设计", "icon":"⌘", "color":"#A88BFF", "level":1, "xp":38, "nextXp":80, "description":"复杂流程与系统边界", "branch":"职业", "tier":2, "parentId":"career" },
+  { "id":"ai", "name":"AI应用判断", "icon":"✣", "color":"#A88BFF", "level":1, "xp":20, "nextXp":90, "description":"连接场景、能力与ROI", "branch":"职业", "tier":3, "parentId":"business" },
+  { "id":"narrative", "name":"价值叙事", "icon":"◫", "color":"#A88BFF", "level":0, "xp":0, "nextXp":90, "description":"让贡献进入组织认知", "branch":"职业", "tier":3, "parentId":"data" },
+  { "id":"leadership", "name":"产品领导力", "icon":"♜", "color":"#A88BFF", "level":0, "xp":0, "nextXp":120, "description":"形成共识并推动改变", "branch":"职业", "tier":4, "parentId":"narrative" },
+
+  { "id":"relationship", "name":"关系连接", "icon":"∞", "color":"#FFD66B", "level":1, "xp":10, "nextXp":80, "description":"重新连接朋友与真实世界", "branch":"关系", "tier":1 },
+  { "id":"friendship", "name":"友情维护", "icon":"∴", "color":"#FFD66B", "level":1, "xp":6, "nextXp":70, "description":"主动联系并持续出现", "branch":"关系", "tier":2, "parentId":"relationship" },
+  { "id":"communication", "name":"真诚表达", "icon":"◌", "color":"#FFD66B", "level":1, "xp":4, "nextXp":70, "description":"表达需要、边界与感受", "branch":"关系", "tier":2, "parentId":"relationship" },
+  { "id":"boundaries", "name":"边界感", "icon":"□", "color":"#FFD66B", "level":0, "xp":0, "nextXp":90, "description":"不替别人承担全部责任", "branch":"关系", "tier":3, "parentId":"communication" },
+  { "id":"intimacy", "name":"亲密关系", "icon":"♡", "color":"#FFD66B", "level":0, "xp":0, "nextXp":110, "description":"建立安全、平等的连接", "branch":"关系", "tier":4, "parentId":"boundaries" }
+]
