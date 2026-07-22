@@ -40,6 +40,7 @@ const activeView = ref<View>("actions");
 const selectedCadence = ref<Cadence>("day");
 const archiveTab = ref<ArchiveTab>("profile");
 const selectedSkillDomain = ref("产品与业务");
+const selectedRouteId = ref("life");
 const ready = ref(false);
 const saved = ref(true);
 const showActionForm = ref(false);
@@ -113,29 +114,70 @@ const growthBars = computed(() => Array.from({ length: 8 }, (_, offset) => {
   const date = new Date(); date.setDate(date.getDate() - (7 - offset)); const key = date.toISOString().slice(0, 10); const record = checkins.value.find(item => item.date === key);
   return { key, label: key.slice(5), value: record ? Object.values(record.habits).filter(Boolean).length : 0 };
 }));
-const routeTaskXp = (routeId: string) => habits.value.filter(action => {
-  if (!actionDone(action)) return false;
+const logRoute = (category: GrowthLog["category"]) => ({ health: "health", life: "life", career: "career", relationship: "relationship", learning: "creation" }[category]);
+const actionRoute = (action: HabitDefinition) => {
   const skill = skills.value.find(item => item.id === action.skillId);
-  return skill ? skillRoute(domainForSkill(skill)) === routeId : false;
-}).reduce((sum, action) => sum + action.xp, 0);
-const routeSkillPower = (routeId: string) => skills.value.filter(skill => skillRoute(domainForSkill(skill)) === routeId).reduce((sum, skill) => sum + skill.level * 5 + Math.min(5, Math.round(skill.xp / 20)), 0);
-const routeQuestPower = (routeId: string) => quests.value.filter(quest => quest.routeId === routeId && quest.status === "done").length * 10;
+  return skill ? skillRoute(domainForSkill(skill)) : "life";
+};
+const actionCompletionCount = (action: HabitDefinition) => (action.cadence ?? "day") === "day"
+  ? checkins.value.filter(record => record.habits[action.id]).length
+  : actionProgress.value.filter(record => record.actionId === action.id && record.completed).length;
+const routeSources = (routeId: string) => {
+  const relatedActions = habits.value.filter(action => actionRoute(action) === routeId);
+  const actionCounts = { day: 0, week: 0, month: 0, quarter: 0 } as Record<Cadence, number>;
+  let actionXp = 0;
+  relatedActions.forEach(action => {
+    const count = actionCompletionCount(action);
+    actionCounts[(action.cadence ?? "day") as Cadence] += count;
+    actionXp += count * action.xp;
+  });
+  const relatedLogs = logs.value.filter(log => logRoute(log.category) === routeId);
+  const doneQuests = quests.value.filter(quest => quest.routeId === routeId && quest.status === "done");
+  return { actionCounts, actionXp, logCount: relatedLogs.length, logXp: relatedLogs.length * 24, questCount: doneQuests.length, questXp: doneQuests.reduce((sum, quest) => sum + quest.xp, 0) };
+};
+const routePoints = (routeId: string) => {
+  const source = routeSources(routeId);
+  return source.actionXp + source.logXp + source.questXp;
+};
+const routeThresholds = [1, 80, 190, 360];
+const routeThresholdLabel = (index: number) => index === 0 ? "首次记录" : `${routeThresholds[index]} XP`;
+const routeProgress = (routeId: string) => Math.min(100, Math.round(routePoints(routeId) / routeThresholds[3] * 100));
+const routeNodeReached = (routeId: string, index: number) => routePoints(routeId) >= routeThresholds[index];
+const routeNextNodeIndex = (routeId: string) => routeThresholds.findIndex(threshold => routePoints(routeId) < threshold);
+const routeNextText = (routeId: string) => {
+  const index = routeNextNodeIndex(routeId);
+  if (index < 0) return "路线已完成，继续积累你的真实证据";
+  const route = routeDimensions.find(item => item.id === routeId);
+  return `距离「${route?.nodes[index]}」还差 ${Math.max(0, routeThresholds[index] - routePoints(routeId))} 点成长值`;
+};
+const routeEvidence = (routeId: string) => {
+  const evidence: { id: string; date: string; type: string; title: string; xp: number }[] = [];
+  checkins.value.forEach(record => {
+    const done = habits.value.filter(action => (action.cadence ?? "day") === "day" && record.habits[action.id] && actionRoute(action) === routeId);
+    if (done.length) evidence.push({ id: `day-${routeId}-${record.date}`, date: record.date, type: "日常行动", title: done.map(item => item.label).join("、"), xp: done.reduce((sum, item) => sum + item.xp, 0) });
+  });
+  actionProgress.value.filter(record => record.completed).forEach(record => {
+    const action = habits.value.find(item => item.id === record.actionId);
+    if (action && actionRoute(action) === routeId) evidence.push({ id: record.id, date: record.updatedAt.slice(0, 10), type: cadenceLabel(action.cadence), title: action.label, xp: action.xp });
+  });
+  logs.value.filter(log => logRoute(log.category) === routeId).forEach(log => evidence.push({ id: log.id, date: log.date, type: "成长日志", title: log.title, xp: 24 }));
+  quests.value.filter(quest => quest.routeId === routeId && quest.status === "done").forEach(quest => evidence.push({ id: quest.id, date: quest.completedAt?.slice(0, 10) ?? today, type: quest.role === "side" ? "支线达成" : "主线达成", title: quest.title, xp: quest.xp }));
+  return evidence.sort((a, b) => b.date.localeCompare(a.date));
+};
+const selectedRoute = computed(() => routeDimensions.find(route => route.id === selectedRouteId.value) ?? routeDimensions[0]);
+const routeOverview = computed(() => ({
+  lit: routeDimensions.reduce((sum, route) => sum + route.nodes.filter((_, index) => routeNodeReached(route.id, index)).length, 0),
+  evidence: routeDimensions.reduce((sum, route) => sum + routeEvidence(route.id).length, 0),
+  progress: Math.round(routeDimensions.reduce((sum, route) => sum + routeProgress(route.id), 0) / routeDimensions.length),
+}));
 const dimensionScores = computed(() => [
-  Math.min(96, 24 + streak.value * 3 + routeTaskXp("health") + routeSkillPower("health")),
-  Math.min(96, 22 + routeTaskXp("life") + routeSkillPower("life") + routeQuestPower("life")),
-  Math.min(96, 20 + routeTaskXp("career") + routeSkillPower("career") + routeQuestPower("career")),
-  Math.min(96, 18 + routeTaskXp("creation") + routeSkillPower("creation") + logs.value.length * 5),
-  Math.min(96, 18 + routeTaskXp("relationship") + routeSkillPower("relationship") + routeQuestPower("relationship")),
-  Math.min(96, 20 + Math.round(totalXp.value / 8) + quests.value.filter(q => q.status === "done").length * 4),
+  routeProgress("health"), routeProgress("life"), routeProgress("career"),
+  routeProgress("creation"), routeProgress("relationship"), routeProgress("finance"),
 ]);
 const radarPolygon = computed(() => {
   const angles = [-90,-30,30,90,150,210];
   return dimensionScores.value.map((score, index) => { const radius = score * .46; const angle = angles[index] * Math.PI / 180; return `${50 + Math.cos(angle) * radius}% ${50 + Math.sin(angle) * radius}%`; }).join(",");
 });
-const routeProgress = (id: string) => {
-  const related = quests.value.filter(q => q.routeId === id); if (!related.length) return 15;
-  return Math.round(related.filter(q => q.status === "done").length / related.length * 100);
-};
 const domainForSkill = (skill: Skill) => {
   if (skill.branch && skill.branch in skillCatalog) return skill.branch;
   if (["health","sleep","nutrition","movement","energy"].includes(skill.id)) return "身体健康";
@@ -309,8 +351,41 @@ onMounted(initialize);
       </template>
 
       <template v-else-if="activeView === 'routes'">
-        <section class="page-intro"><div><p class="kicker">MULTI-DIMENSION GROWTH</p><h2>六条成长线，汇向同一种生活</h2><p>成长不是单线升级。身体、生活、创造、职业、关系与财务会互相支撑。</p></div><button class="secondary" @click="activeView='archive';archiveTab='quests';showQuestForm=true">＋ 规划路线任务</button></section>
-        <section class="route-dashboard panel"><div class="route-header"><span>成长维度</span><span>起步</span><span>积累</span><span>突破</span><span>愿景</span></div><div class="route-lanes"><article v-for="route in routeDimensions" :key="route.id" :style="{'--route':route.color}"><div class="route-name"><i>{{ route.icon }}</i><div><b>{{ route.name }}</b><small>{{ routeProgress(route.id) }}% 已探索</small></div></div><div class="route-track"><span v-for="(node,index) in route.nodes" :key="node" :class="{reached:routeProgress(route.id)>index*25}"><i></i><small>{{ node }}</small></span><div class="route-fill" :style="{width:routeProgress(route.id)+'%'}"></div></div></article></div><div class="convergence"><div><span>CONVERGENCE</span><b>有能量、有作品、有关系，也有选择的生活</b></div><strong>{{ Math.round(routeDimensions.reduce((n,r)=>n+routeProgress(r.id),0)/routeDimensions.length) }}%</strong></div></section>
+        <section class="page-intro route-intro"><div><p class="kicker">ARCANE GROWTH JOURNEY</p><h2>每一次行动，都在星路上留下光</h2><p>日常习惯汇成周、月与季度成果；日志与任务成为里程碑证据，逐步点亮你的六条成长线。</p></div><button class="secondary" @click="activeView='archive';archiveTab='quests';showQuestForm=true">＋ 规划路线任务</button></section>
+        <section class="growth-source-strip panel" aria-label="成长数据来源">
+          <div><span>✦</span><b>{{ routeOverview.evidence }}</b><small>成长证据</small></div>
+          <div v-for="tab in cadenceTabs" :key="tab.id"><span>{{ tab.id==='day'?'☀':tab.id==='week'?'☾':tab.id==='month'?'◐':'✧' }}</span><b>{{ routeDimensions.reduce((sum,route)=>sum+routeSources(route.id).actionCounts[tab.id],0) }}</b><small>{{ tab.label }}行动达成</small></div>
+          <div><span>◇</span><b>{{ logs.length }}</b><small>成长日志</small></div>
+          <div class="source-total"><span>已点亮</span><b>{{ routeOverview.lit }}<em>/24</em></b><small>成长节点</small></div>
+        </section>
+        <section class="arcane-route-map panel">
+          <div class="map-aura" aria-hidden="true"><i></i><i></i><span>✦</span><span>✧</span></div>
+          <div class="map-heading"><div><p class="kicker">YOUR LIVING CONSTELLATION</p><h3>魔法成长地图</h3><p>节点不是手动打卡。它们由其他页面的真实完成记录自动唤醒。</p></div><div class="map-score"><b>{{ routeOverview.progress }}%</b><small>生命图谱共鸣</small></div></div>
+          <div class="route-spell-grid">
+            <article v-for="route in routeDimensions" :key="route.id" :class="['spell-route',{selected:selectedRouteId===route.id}]" :style="{'--route':route.color}" @click="selectedRouteId=route.id">
+              <button type="button" class="spell-route-title" @click.stop="selectedRouteId=route.id"><i>{{ route.icon }}</i><span><b>{{ route.name }}</b><small>{{ routePoints(route.id) }} 成长值 · {{ routeProgress(route.id) }}%</small></span><em>{{ selectedRouteId===route.id?'正在观测':'展开' }}</em></button>
+              <div class="curve-stage">
+                <svg viewBox="0 0 720 136" preserveAspectRatio="none" aria-hidden="true">
+                  <defs><linearGradient :id="`route-gradient-${route.id}`" x1="0" y1="0" x2="1" y2="0"><stop offset="0" :stop-color="route.color" stop-opacity=".35"/><stop offset=".55" :stop-color="route.color"/><stop offset="1" stop-color="#f8dca8"/></linearGradient></defs>
+                  <path class="curve-shadow" d="M24 90 C150 12 238 124 362 62 S566 20 696 74" pathLength="100"/>
+                  <path class="curve-light" d="M24 90 C150 12 238 124 362 62 S566 20 696 74" pathLength="100" :stroke="`url(#route-gradient-${route.id})`" :style="{strokeDashoffset:100-routeProgress(route.id)}"/>
+                </svg>
+                <button v-for="(node,index) in route.nodes" :key="node" type="button" :class="['route-star',`star-${index}`,{lit:routeNodeReached(route.id,index),next:routeNextNodeIndex(route.id)===index}]" :aria-label="`${node}，${routeNodeReached(route.id,index)?'已点亮':'未点亮'}`" @click.stop="selectedRouteId=route.id">
+                  <i>{{ routeNodeReached(route.id,index)?'✦':'✧' }}</i><span>{{ node }}</span><small>{{ routeThresholdLabel(index) }}</small>
+                </button>
+              </div>
+              <div class="spell-route-foot"><span>{{ routeNextText(route.id) }}</span><i><b :style="{width:routeProgress(route.id)+'%'}"></b></i></div>
+            </article>
+          </div>
+        </section>
+        <section class="route-evidence panel" :style="{'--route':selectedRoute.color}">
+          <div class="evidence-sigil"><span>{{ selectedRoute.icon }}</span><i></i></div>
+          <div class="evidence-main"><div class="section-head"><div><p class="kicker">LIGHT SOURCES</p><h3>{{ selectedRoute.name }} · 点亮记录</h3></div><strong>{{ routePoints(selectedRoute.id) }} XP</strong></div>
+            <div class="source-chips"><span>日 {{ routeSources(selectedRoute.id).actionCounts.day }}</span><span>周 {{ routeSources(selectedRoute.id).actionCounts.week }}</span><span>月 {{ routeSources(selectedRoute.id).actionCounts.month }}</span><span>季 {{ routeSources(selectedRoute.id).actionCounts.quarter }}</span><span>日志 {{ routeSources(selectedRoute.id).logCount }}</span><span>任务 {{ routeSources(selectedRoute.id).questCount }}</span></div>
+            <div v-if="routeEvidence(selectedRoute.id).length" class="evidence-list"><article v-for="item in routeEvidence(selectedRoute.id).slice(0,5)" :key="item.id"><i>✦</i><div><b>{{ item.title }}</b><small>{{ item.date }} · {{ item.type }}</small></div><strong>+{{ item.xp }}</strong></article></div>
+            <div v-else class="empty-evidence"><span>✧</span><div><b>这条星路仍在等待第一束光</b><p>回到行动首页完成一个关联行动，或在成长档案留下对应日志。</p></div></div>
+          </div>
+        </section>
       </template>
 
       <template v-else-if="activeView === 'skills'">
