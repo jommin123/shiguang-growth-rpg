@@ -70,24 +70,79 @@ const mergeSeeds = <T extends { id: string }>(seed: T[], savedItems: T[]) => [
   ...savedItems.filter(saved => !seed.some(item => item.id === saved.id)),
 ];
 const cadenceLabel = (cadence?: Cadence) => ({ day: "每日", week: "每周", month: "每月", quarter: "每季度" }[cadence ?? "day"]);
-const periodKey = (cadence: Cadence) => {
-  const date = new Date(); const year = date.getFullYear();
-  if (cadence === "day") return today;
+const parseDate = (value: string) => { const [year, month, day] = value.split("-").map(Number); return new Date(year, month - 1, day, 12); };
+const dateKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+const periodKey = (cadence: Cadence, source = new Date()) => {
+  const date = new Date(source); const year = date.getFullYear();
+  if (cadence === "day") return dateKey(date);
   if (cadence === "month") return `${year}-${String(date.getMonth() + 1).padStart(2, "0")}`;
   if (cadence === "quarter") return `${year}-Q${Math.floor(date.getMonth() / 3) + 1}`;
   const start = new Date(year, 0, 1); const week = Math.ceil((((date.getTime() - start.getTime()) / 86400000) + start.getDay() + 1) / 7);
   return `${year}-W${String(week).padStart(2, "0")}`;
 };
+const periodBounds = (cadence: Cadence, anchor = new Date()) => {
+  const start = new Date(anchor); start.setHours(12, 0, 0, 0);
+  if (cadence === "day") return { start, end: new Date(start) };
+  if (cadence === "week") start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+  if (cadence === "month") start.setDate(1);
+  if (cadence === "quarter") { start.setMonth(Math.floor(start.getMonth() / 3) * 3, 1); }
+  const end = new Date(start);
+  if (cadence === "week") end.setDate(end.getDate() + 6);
+  if (cadence === "month") end.setMonth(end.getMonth() + 1, 0);
+  if (cadence === "quarter") { end.setMonth(end.getMonth() + 3, 0); }
+  return { start, end };
+};
+const nextCadence = (cadence: Cadence) => ({ day: "week", week: "month", month: "quarter", quarter: undefined } as const)[cadence];
 const parentAction = (action: HabitDefinition) => habits.value.find(item => item.id === action.parentId);
 const childrenOf = (id: string) => habits.value.filter(item => item.parentId === id);
-const actionsForCadence = computed(() => habits.value.filter(item => (item.cadence ?? "day") === selectedCadence.value));
-const progressRecord = (action: HabitDefinition) => actionProgress.value.find(item => item.id === `${periodKey((action.cadence ?? "day") as Cadence)}:${action.id}`);
-const actionDone = (action: HabitDefinition) => action.cadence === "day" || !action.cadence ? !!currentCheckin.habits[action.id] : !!progressRecord(action)?.completed;
-const actionValue = (action: HabitDefinition) => {
-  const children = childrenOf(action.id);
-  const childValue = children.filter(child => actionDone(child)).length;
-  return Math.max(progressRecord(action)?.value ?? 0, childValue);
+const actionFlowLabel = (action: HabitDefinition) => {
+  const labels = [action.label]; const seen = new Set([action.id]); let current = parentAction(action);
+  while (current && !seen.has(current.id)) { labels.push(current.label); seen.add(current.id); current = parentAction(current); }
+  return labels.join(" → ");
 };
+const actionParentOptions = computed(() => {
+  const parentCadence = nextCadence(actionDraft.cadence);
+  return parentCadence ? habits.value.filter(item => (item.cadence ?? "day") === parentCadence) : [];
+});
+const selectedActionSkill = computed(() => skills.value.find(skill => skill.id === actionDraft.skillId));
+const selectedActionRoute = computed(() => routeDimensions.find(route => route.id === (selectedActionSkill.value ? skillRoute(domainForSkill(selectedActionSkill.value)) : "life")) ?? routeDimensions[1]);
+const actionsForCadence = computed(() => habits.value.filter(item => (item.cadence ?? "day") === selectedCadence.value));
+const progressRecordAt = (action: HabitDefinition, anchor = new Date()) => actionProgress.value.find(item => item.id === `${periodKey((action.cadence ?? "day") as Cadence, anchor)}:${action.id}`);
+const progressRecord = (action: HabitDefinition) => progressRecordAt(action);
+const checkinDoneAt = (action: HabitDefinition, anchor: Date) => {
+  const key = dateKey(anchor);
+  if (key === today) return !!currentCheckin.habits[action.id];
+  return !!checkins.value.find(item => item.date === key)?.habits[action.id];
+};
+const childPeriodAnchors = (parentCadence: Cadence, childCadence: Cadence, anchor: Date) => {
+  const { start, end } = periodBounds(parentCadence, anchor); const seen = new Set<string>(); const anchors: Date[] = [];
+  for (const cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
+    const key = periodKey(childCadence, cursor);
+    if (!seen.has(key)) { seen.add(key); anchors.push(new Date(cursor)); }
+  }
+  return anchors;
+};
+const actionValueAt = (action: HabitDefinition, anchor = new Date(), visited = new Set<string>()): number => {
+  const cadence = (action.cadence ?? "day") as Cadence;
+  if (cadence === "day") return checkinDoneAt(action, anchor) ? 1 : 0;
+  const visitKey = `${periodKey(cadence, anchor)}:${action.id}`;
+  if (visited.has(visitKey)) return 0;
+  const branch = new Set(visited); branch.add(visitKey);
+  const manualValue = progressRecordAt(action, anchor)?.value ?? 0;
+  const autoValue = childrenOf(action.id).reduce((sum, child) => {
+    const childCadence = (child.cadence ?? "day") as Cadence;
+    return sum + childPeriodAnchors(cadence, childCadence, anchor).filter(childAnchor => actionDoneAt(child, childAnchor, branch)).length;
+  }, 0);
+  return Math.max(manualValue, autoValue);
+};
+const actionDoneAt = (action: HabitDefinition, anchor = new Date(), visited = new Set<string>()): boolean => {
+  const cadence = (action.cadence ?? "day") as Cadence;
+  if (cadence === "day") return checkinDoneAt(action, anchor);
+  if (progressRecordAt(action, anchor)?.completed) return true;
+  return actionValueAt(action, anchor, visited) >= Math.max(1, action.target ?? 1);
+};
+const actionDone = (action: HabitDefinition) => actionDoneAt(action);
+const actionValue = (action: HabitDefinition) => actionValueAt(action);
 const actionPercent = (action: HabitDefinition) => actionDone(action) ? 100 : Math.min(100, Math.round(actionValue(action) / Math.max(1, action.target ?? 1) * 100));
 const cadenceCompletion = computed(() => {
   if (!actionsForCadence.value.length) return 0;
@@ -100,7 +155,7 @@ const streak = computed(() => {
 });
 const totalXp = computed(() => {
   const dailyXp = checkins.value.reduce((sum, day) => sum + habits.value.filter(h => (h.cadence ?? "day") === "day").reduce((xp, habit) => xp + (day.habits[habit.id] ? habit.xp : 0), 0), 0);
-  const periodXp = actionProgress.value.filter(item => item.completed).reduce((sum, item) => sum + (habits.value.find(h => h.id === item.actionId)?.xp ?? 0), 0);
+  const periodXp = habits.value.filter(item => (item.cadence ?? "day") !== "day").reduce((sum, action) => sum + actionCompletionCount(action) * action.xp, 0);
   return dailyXp + periodXp + quests.value.filter(q => q.status === "done").reduce((sum, q) => sum + q.xp, 0);
 });
 const currentStage = computed(() => [...stages].reverse().find(stage => totalXp.value >= stage.minXp) ?? stages[0]);
@@ -119,9 +174,19 @@ const actionRoute = (action: HabitDefinition) => {
   const skill = skills.value.find(item => item.id === action.skillId);
   return skill ? skillRoute(domainForSkill(skill)) : "life";
 };
-const actionCompletionCount = (action: HabitDefinition) => (action.cadence ?? "day") === "day"
-  ? checkins.value.filter(record => record.habits[action.id]).length
-  : actionProgress.value.filter(record => record.actionId === action.id && record.completed).length;
+const historyAnchors = (cadence: Cadence) => {
+  const start = parseDate(profile.startedAt || today); const end = parseDate(today); const seen = new Set<string>(); const anchors: Date[] = [];
+  for (const cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
+    const key = periodKey(cadence, cursor);
+    if (!seen.has(key)) { seen.add(key); anchors.push(new Date(cursor)); }
+  }
+  return anchors;
+};
+const actionCompletionCount = (action: HabitDefinition) => {
+  const cadence = (action.cadence ?? "day") as Cadence;
+  if (cadence === "day") return checkins.value.filter(record => record.habits[action.id]).length + (checkins.value.some(record => record.date === today) ? 0 : (currentCheckin.habits[action.id] ? 1 : 0));
+  return historyAnchors(cadence).filter(anchor => actionDoneAt(action, anchor)).length;
+};
 const routeSources = (routeId: string) => {
   const relatedActions = habits.value.filter(action => actionRoute(action) === routeId);
   const actionCounts = { day: 0, week: 0, month: 0, quarter: 0 } as Record<Cadence, number>;
@@ -156,9 +221,12 @@ const routeEvidence = (routeId: string) => {
     const done = habits.value.filter(action => (action.cadence ?? "day") === "day" && record.habits[action.id] && actionRoute(action) === routeId);
     if (done.length) evidence.push({ id: `day-${routeId}-${record.date}`, date: record.date, type: "日常行动", title: done.map(item => item.label).join("、"), xp: done.reduce((sum, item) => sum + item.xp, 0) });
   });
-  actionProgress.value.filter(record => record.completed).forEach(record => {
-    const action = habits.value.find(item => item.id === record.actionId);
-    if (action && actionRoute(action) === routeId) evidence.push({ id: record.id, date: record.updatedAt.slice(0, 10), type: cadenceLabel(action.cadence), title: action.label, xp: action.xp });
+  habits.value.filter(action => (action.cadence ?? "day") !== "day" && actionRoute(action) === routeId).forEach(action => {
+    const cadence = action.cadence as Cadence;
+    historyAnchors(cadence).filter(anchor => actionDoneAt(action, anchor)).forEach(anchor => {
+      const period = periodKey(cadence, anchor); const completedOn = periodBounds(cadence, anchor).end; const visibleDate = completedOn > parseDate(today) ? parseDate(today) : completedOn;
+      evidence.push({ id: `period-${period}-${action.id}`, date: dateKey(visibleDate), type: `${cadenceLabel(cadence)}汇聚`, title: action.label, xp: action.xp });
+    });
   });
   logs.value.filter(log => logRoute(log.category) === routeId).forEach(log => evidence.push({ id: log.id, date: log.date, type: "成长日志", title: log.title, xp: 24 }));
   quests.value.filter(quest => quest.routeId === routeId && quest.status === "done").forEach(quest => evidence.push({ id: quest.id, date: quest.completedAt?.slice(0, 10) ?? today, type: quest.role === "side" ? "支线达成" : "主线达成", title: quest.title, xp: quest.xp }));
@@ -246,7 +314,9 @@ async function adjustSkillXp(skillId: string, delta: number) {
   if (skill.parentId) await adjustSkillXp(skill.parentId, Math.round(delta * .4));
 }
 async function addAction() {
-  if (!actionDraft.label.trim()) return; const action: HabitDefinition = { id: `action-${crypto.randomUUID()}`, label: actionDraft.label.trim(), icon: actionDraft.icon || "✦", xp: Number(actionDraft.xp), skillId: actionDraft.skillId, cadence: actionDraft.cadence, parentId: actionDraft.parentId || undefined, relation: actionDraft.relation, target: Number(actionDraft.target), custom: true };
+  if (!actionDraft.label.trim()) return;
+  const validParent = actionParentOptions.value.some(item => item.id === actionDraft.parentId) ? actionDraft.parentId : undefined;
+  const action: HabitDefinition = { id: `action-${crypto.randomUUID()}`, label: actionDraft.label.trim(), icon: actionDraft.icon || "✦", xp: Number(actionDraft.xp), skillId: actionDraft.skillId, cadence: actionDraft.cadence, parentId: validParent, relation: actionDraft.relation, target: Number(actionDraft.target), custom: true };
   habits.value.push(action); if (action.cadence === "day") currentCheckin.habits[action.id] = false; await growthDb.saveHabit(action); actionDraft.label = ""; showActionForm.value = false;
 }
 async function toggleQuest(quest: Quest) { quest.status = quest.status === "done" ? "todo" : "done"; quest.completedAt = quest.status === "done" ? new Date().toISOString() : undefined; await growthDb.saveQuest({ ...quest }); await syncProfile(); }
@@ -346,8 +416,8 @@ onMounted(initialize);
           <div class="hero-progress"><div class="progress-track"><i :style="{width:cadenceCompletion+'%'}"></i><span class="progress-comet" :style="{left:cadenceCompletion+'%'}">✦</span></div><div class="progress-meta"><span>{{ actionsForCadence.filter(actionDone).length }} 项已完成</span><span>{{ actionsForCadence.length }} 项计划</span></div><div class="cycle-stats"><div><small>连续记录</small><b>{{ streak }} 天</b></div><div><small>当前阶段</small><b>{{ currentStage.title }}</b></div><div><small>总成长值</small><b>{{ totalXp }} XP</b></div></div></div>
         </section>
         <div class="cadence-switch"><button v-for="tab in cadenceTabs" :key="tab.id" :class="{active:selectedCadence===tab.id}" @click="selectedCadence=tab.id"><b>{{ tab.label }}</b><span>{{ tab.caption }}</span></button><button class="create-action" @click="actionDraft.cadence=selectedCadence;showActionForm=!showActionForm">＋ 新建{{ cadenceTabs.find(t=>t.id===selectedCadence)?.label }}行动</button></div>
-        <form v-if="showActionForm" class="smart-form panel" @submit.prevent="addAction"><div class="form-title"><span>NEW ACTION</span><b>创建一个{{ cadenceLabel(actionDraft.cadence) }}行动</b></div><label class="icon-field">图标<input v-model="actionDraft.icon" maxlength="2"></label><label class="grow">行动名称<input v-model="actionDraft.label" placeholder="清晰、可完成，例如：周日整理下周菜单"></label><label>周期<select v-model="actionDraft.cadence"><option v-for="tab in cadenceTabs" :key="tab.id" :value="tab.id">{{ tab.label }}</option></select></label><label>上级目标<select v-model="actionDraft.parentId"><option value="">不关联上级</option><option v-for="item in habits.filter(h=>h.id!==actionDraft.parentId)" :key="item.id" :value="item.id">{{ cadenceLabel(item.cadence) }} · {{ item.label }}</option></select></label><label>关系<select v-model="actionDraft.relation"><option value="aggregate">聚合：完成即贡献进度</option><option value="transform">转化：产出阶段成果</option></select></label><label>目标次数<input v-model.number="actionDraft.target" type="number" min="1" max="99"></label><label>关联技能<select v-model="actionDraft.skillId"><option v-for="skill in skills" :key="skill.id" :value="skill.id">{{ skill.name }}</option></select></label><button class="primary" type="submit">保存行动</button></form>
-        <section class="action-layout compact"><article class="action-list panel"><div class="section-head"><div><p class="kicker">{{ cadenceLabel(selectedCadence) }}任务层</p><h2>{{ cadenceTabs.find(t=>t.id===selectedCadence)?.caption }}行动</h2></div><span>{{ actionsForCadence.length }} ITEMS</span></div><div class="action-cards"><button v-for="action in actionsForCadence" :key="action.id" type="button" :class="['action-card',{done:actionDone(action)}]" @click="toggleAction(action)"><i class="action-check">{{ actionDone(action)?'✓':'' }}</i><span class="action-icon">{{ action.icon }}</span><div class="action-copy"><div><b>{{ action.label }}</b><em v-if="action.custom">自定义</em></div><small v-if="parentAction(action)"><strong>{{ action.relation==='transform'?'成果转化':'进度汇入' }}</strong> {{ parentAction(action)?.label }} · 上级 {{ actionPercent(parentAction(action)!) }}%</small><small v-else>独立行动</small><div class="skill-impact"><span :class="{lit:actionDone(action)}">✦</span><b>{{ actionDone(action)?'已点亮':'将点亮' }} · {{ skills.find(s=>s.id===action.skillId)?.name ?? '待关联技能' }}</b></div><div class="mini-progress" v-if="action.cadence!=='day'"><i :style="{width:actionPercent(action)+'%'}"></i></div></div><div class="action-reward"><b>+{{ action.xp }}</b><small>XP</small></div></button><div v-if="!actionsForCadence.length" class="empty-inline">这个周期还没有行动，从技能星图选择节点加入。</div></div></article></section>
+        <form v-if="showActionForm" class="smart-form action-builder panel" @submit.prevent="addAction"><div class="form-title"><span>NEW ACTION</span><b>创建一个{{ cadenceLabel(actionDraft.cadence) }}行动</b></div><label class="icon-field">图标<input v-model="actionDraft.icon" maxlength="2"></label><label class="grow">行动名称<input v-model="actionDraft.label" placeholder="清晰、可完成，例如：周日整理下周菜单"></label><label>周期<select v-model="actionDraft.cadence" @change="actionDraft.parentId='' "><option v-for="tab in cadenceTabs" :key="tab.id" :value="tab.id">{{ tab.label }}</option></select></label><label v-if="nextCadence(actionDraft.cadence)">汇入哪个{{ cadenceLabel(nextCadence(actionDraft.cadence)) }}目标<select v-model="actionDraft.parentId"><option value="">暂不汇入</option><option v-for="item in actionParentOptions" :key="item.id" :value="item.id">{{ item.label }}</option></select></label><label v-if="actionDraft.parentId">汇聚方式<select v-model="actionDraft.relation"><option value="aggregate">累计：每次完成都计入上级</option><option value="transform">成果：本周期达标后计入一次</option></select></label><label>本周期目标<input v-model.number="actionDraft.target" type="number" min="1" max="99"></label><label>点亮技能<select v-model="actionDraft.skillId"><option v-for="skill in skills" :key="skill.id" :value="skill.id">{{ skill.name }}</option></select></label><button class="primary" type="submit">保存行动</button><div class="flow-preview"><span>{{ cadenceLabel(actionDraft.cadence) }}行动</span><i>汇聚</i><span>{{ actionDraft.parentId ? habits.find(item=>item.id===actionDraft.parentId)?.label : (nextCadence(actionDraft.cadence) ? `待选择${cadenceLabel(nextCadence(actionDraft.cadence))}目标` : '季度成果') }}</span><i>点亮</i><span>{{ selectedActionSkill?.name ?? '技能节点' }}</span><i>流向</i><strong>{{ selectedActionRoute.name }}</strong></div></form>
+        <section class="action-layout compact"><article class="action-list panel"><div class="section-head"><div><p class="kicker">{{ cadenceLabel(selectedCadence) }}任务层</p><h2>{{ cadenceTabs.find(t=>t.id===selectedCadence)?.caption }}行动</h2></div><span>{{ actionsForCadence.length }} ITEMS</span></div><div class="action-cards"><button v-for="action in actionsForCadence" :key="action.id" type="button" :class="['action-card',{done:actionDone(action),derived:childrenOf(action.id).length}]" @click="childrenOf(action.id).length ? null : toggleAction(action)"><i class="action-check">{{ actionDone(action)?'✓':'' }}</i><span class="action-icon">{{ action.icon }}</span><div class="action-copy"><div><b>{{ action.label }}</b><em v-if="childrenOf(action.id).length">自动汇聚</em><em v-else-if="action.custom">自定义</em></div><small v-if="parentAction(action)"><strong>{{ action.relation==='transform'?'达标后汇入':'逐次向上汇入' }}</strong> {{ actionFlowLabel(action) }}</small><small v-else-if="childrenOf(action.id).length">由下级自动累计 · {{ actionValue(action) }}/{{ action.target ?? 1 }}</small><small v-else>独立行动</small><div class="skill-impact"><span :class="{lit:actionDone(action)}">✦</span><b>{{ actionDone(action)?'已点亮':'将点亮' }} · {{ skills.find(s=>s.id===action.skillId)?.name ?? '待关联技能' }}</b></div><div class="mini-progress" v-if="action.cadence!=='day'"><i :style="{width:actionPercent(action)+'%'}"></i></div></div><div class="action-reward"><b>{{ actionValue(action) }}/{{ action.target ?? 1 }}</b><small>{{ childrenOf(action.id).length?'自动累计':`+${action.xp} XP` }}</small></div></button><div v-if="!actionsForCadence.length" class="empty-inline">这个周期还没有行动，从技能星图选择节点加入。</div></div></article></section>
       </template>
 
       <template v-else-if="activeView === 'routes'">
