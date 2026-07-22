@@ -115,3 +115,22 @@ button{-webkit-tap-highlight-color:transparent}button:active{transition-duration
 @media(max-width:1050px){.growth-source-strip{grid-template-columns:repeat(4,1fr)}.growth-source-strip>div:nth-child(4){border-right:0}.route-spell-grid{grid-template-columns:1fr}.route-evidence{grid-template-columns:110px minmax(0,1fr)}}
 @media(max-width:720px){.growth-source-strip{grid-template-columns:repeat(2,1fr)}.growth-source-strip>div:nth-child(2n){border-right:0}.map-heading{align-items:flex-start}.map-heading p{max-width:240px}.arcane-route-map{padding:15px}.curve-stage{height:126px}.route-evidence{grid-template-columns:1fr}.evidence-sigil{display:none}.evidence-list{grid-template-columns:1fr}.spell-route-foot{grid-template-columns:1fr}.route-star>span{font-size:7px}}
 @media(prefers-reduced-motion:reduce){.map-aura span,.route-star.lit>i,.route-star.next>i,.evidence-sigil:after{animation:none!important}.spell-route,.route-star,.curve-light,.spell-route-foot b{transition:opacity .18s ease!important}}
+
+/* Full-width skill observatory: never let the node controls crop the constellation. */
+.skill-console{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;width:100%;min-width:0}
+.talent-wheel{width:100%;height:clamp(820px,82cqw,1040px);min-height:820px;overflow:hidden}
+.talent-wheel:before{width:clamp(650px,78cqw,940px);height:clamp(650px,78cqw,940px)}
+.talent-wheel:after{width:clamp(410px,51cqw,610px);height:clamp(410px,51cqw,610px)}
+.orbit-branch{width:clamp(270px,30cqw,390px)}
+.micro-star{transform:translate(-50%,-50%) rotate(var(--micro-angle)) translateX(clamp(345px,40cqw,500px)) rotate(calc(-1 * var(--micro-angle)))}
+.skill-config,.skill-config.flip{position:static;inset:auto;width:100%;min-height:0;padding:18px 22px;display:grid;grid-template-columns:minmax(210px,.7fr) minmax(0,1.3fr);align-items:center;gap:24px}
+.skill-config .selected-skill{margin:12px 0 0}.skill-config form{margin:0;display:grid;grid-template-columns:minmax(150px,210px) minmax(170px,260px) minmax(160px,1fr);align-items:end;gap:10px}.skill-config form label{min-width:0}.skill-config form select{width:100%}.skill-config .primary{width:100%;min-height:38px}
+
+@media(max-width:1180px){
+  .talent-wheel{height:clamp(700px,92cqw,900px);min-height:700px}.talent-wheel:before{width:82cqw;height:82cqw}.talent-wheel:after{width:54cqw;height:54cqw}.orbit-branch{width:34cqw}.micro-star{transform:translate(-50%,-50%) rotate(var(--micro-angle)) translateX(43cqw) rotate(calc(-1 * var(--micro-angle)))}
+  .skill-config,.skill-config.flip{grid-template-columns:minmax(190px,.6fr) minmax(0,1.4fr)}.skill-config form{grid-template-columns:minmax(140px,190px) minmax(160px,220px) 1fr}
+}
+@media(max-width:760px){
+  .talent-wheel{height:clamp(450px,132cqw,590px);min-height:450px}.talent-wheel:before{width:96cqw;height:96cqw}.talent-wheel:after{width:62cqw;height:62cqw}.orbit-branch{width:36cqw}.micro-star{transform:translate(-50%,-50%) rotate(var(--micro-angle)) translateX(47cqw) rotate(calc(-1 * var(--micro-angle)))}
+  .skill-config,.skill-config.flip{display:grid;grid-template-columns:1fr;padding:17px;gap:11px}.skill-config .selected-skill{margin:8px 0}.skill-config form{grid-template-columns:1fr}.skill-config .primary{grid-column:1/-1}
+}
