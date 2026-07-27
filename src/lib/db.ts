@@ -47,6 +47,7 @@ export const growthDb = {
   async saveSkill(value: Skill) { return (await dbPromise).put("skills", value); },
   async getActionProgress() { return (await dbPromise).getAll("actionProgress"); },
   async saveActionProgress(value: ActionProgress) { return (await dbPromise).put("actionProgress", value); },
+  async deleteActionProgress(id: string) { return (await dbPromise).delete("actionProgress", id); },
   async restoreBackup(backup: BackupData) {
     const db = await dbPromise;
     const names = ["profile", "habits", "checkins", "logs", "quests", "skills", "actionProgress"] as const;
